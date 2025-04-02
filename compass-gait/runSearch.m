@@ -11,7 +11,7 @@ function [qd_sym, dqd_sym] = runSearch(sys)
     nlcon = @(b_ij) nlConstraints(b_ij, T, k, sys);
     
     %% Run optimization to find optimal spline
-    options = optimoptions('fmincon','Display','iter','MaxFunctionEvaluations',1e10);
+    options = optimoptions('fmincon','Display','iter','MaxFunctionEvaluations',1e3);
     b_ij_optimized= fmincon(cost,b_ij0,[],[],[],[],[],[],nlcon,options);
     C = reshape(b_ij_optimized,[sys.nq k]); % fmincon requires optimisation params to be a vector
 
@@ -31,6 +31,7 @@ function [qd_sym, dqd_sym] = runSearch(sys)
     dqd2 = polyfit(q(:,1),dq(:,2),spline_dimension);
     qd_sym = poly2sym(qd,sys.q_sym(1));
     dqd_sym = [poly2sym(dqd1,sys.q_sym(1));poly2sym(dqd2,sys.q_sym(1));];
+    disp('Gait trajectory optimisation finished.')
 end
 
 %% Cost function and constraints
