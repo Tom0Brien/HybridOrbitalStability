@@ -1,0 +1,179 @@
+close all;
+clear;
+clc;
+
+%% Parameters
+syms q1 q2 p1 p2 
+sys.q = [q1;q2];
+sys.p = [p1;p2];
+
+% Dynamics
+sys.m = 1;
+sys.M = sys.m*eye(2);
+sys.g = 9.81;
+sys.V = @(q) sys.m*sys.g*q(2);
+sys.H = @(q,p) p.'*M*p + V(q);
+sys.J = [zeros(2), eye(2); -eye(2), zeros(2)];
+
+sys.dHdq = [0; sys.m*sys.g];
+sys.dHdp = @(p) [p(1)/sys.m; p(2)/sys.m];
+sys.G = eye(2);
+
+% Hybrid conditions
+sys.a = 0;
+sys.b = 1;
+sys.phase = 1; % 1 = go right, -1 go left
+sys.P = [-1,0;0,1];
+
+% Controller gains
+sys.K_p = 10*eye(2);
+sys.K_d = 5*eye(2);
+
+%% Initial conditions
+x0 = [0.1; 0.5; 0; 0];  % Initial state ([q1; q2; p1; p2])
+
+%% Integrate system with ode45 and event detection
+impact_event = @(t,x) collision_events(t,x,sys);
+options = odeset('Events', impact_event, 'RelTol', 1e-6, 'AbsTol', 1e-6);
+T = 5;  % Simulation time
+tspan = [0, T];
+t_out = [];
+x_out = [];
+phase_out = [];
+event_indices = [];
+while tspan(1) < T
+    [t, x] = ode45(@(t, x) system_dynamics(t, x, sys), tspan, x0, options);
+    t_out = [t_out; t];
+    x_out = [x_out; x];
+    phase_out = [phase_out; repmat(sys.phase, length(t), 1)];
+    
+    if ~isempty(t) && t(end) == tspan(2)
+        break; % Simulation finished
+    end
+
+    % Record the event index
+    event_indices = [event_indices; length(t_out)];
+
+    % Apply impact mapping
+    x_minus= x(end, :)';
+    x0 = impact_mapping(x_minus,sys);
+    sys.phase = sys.phase * -1; % Flip directon of desired velocity
+    tspan(1) = t(end);
+end
+
+% Define the color palette
+colors = ['#440087'; '#13B0E4'; '#D4FFFD'; '#7DEEF1'];
+
+% Function to convert hex color code to RGB
+hexToRGB = @(hex) sscanf(hex(2:end), '%2x') / 255;
+
+%% Plotting
+figure;
+
+subplot(4,1,1);
+plot(t_out, x_out(:,1), 'LineWidth', 4, 'Color', hexToRGB(colors(2,:)));
+title('Closed-Loop Simulation results','FontSize', 16);
+xlabel('$t (s)$', 'Interpreter','latex','FontSize', 16);
+ylabel('$q_1$', 'Interpreter','latex','FontSize', 16);
+
+subplot(4,1,2);
+plot(t_out, x_out(:,2), 'LineWidth', 4, 'Color', hexToRGB(colors(2,:)));
+xlabel('$t (s)$', 'Interpreter','latex','FontSize', 16);
+ylabel('$q_2$', 'Interpreter','latex','FontSize', 16);
+
+subplot(4,1,3);
+plot(t_out, x_out(:,3), 'LineWidth', 4, 'Color', hexToRGB(colors(2,:)));
+xlabel('$t (s)$', 'Interpreter','latex','FontSize', 16);
+ylabel('$p_1$', 'Interpreter','latex','FontSize', 16);
+
+subplot(4,1,4);
+plot(t_out, x_out(:,4), 'LineWidth', 4, 'Color', hexToRGB(colors(2,:)));
+xlabel('$t (s)$', 'Interpreter','latex','FontSize', 16);
+ylabel('$p_2$', 'Interpreter','latex','FontSize', 16);
+
+% Plot closed loop energy
+H_tilde_out = zeros(size(t_out));
+q_tilde_out = zeros(length(t_out),2);
+p_tilde_out = zeros(length(t_out),2);
+qd_out = zeros(length(t_out),2);
+for i = 1:(length(t_out))
+    sys.phase = phase_out(i);
+    sys.qd = @(q) [q(1); 0.5 * sys.phase * sin(pi * (q(1) - sys.a) / (sys.b - sys.a))];
+    sys.qtilde = @(q) q - sys.qd(q);
+    qd_out(i, :) = sys.qd(x_out(i, 1:2)');
+    sys.qdotstar = @(q) sys.phase*subs(jacobian(sys.qd(sys.q),sys.q(1)),sys.q(1),q(1));
+    sys.dqtildedq = @(q) subs(jacobian(sys.qtilde(sys.q),sys.q),sys.q, q);
+    sys.pd = @(q) sys.M*(sys.qdotstar(q) - sys.K_p*sys.dqtildedq(q).'*sys.qtilde(q));
+    sys.dpddq = @(q) subs(jacobian(sys.pd(sys.q),sys.q),sys.q,q);
+    sys.ptilde = @(q,p) p - sys.pd(q);
+    sys.H_tilde = @(q,p) 0.5*sys.qtilde(q).'*sys.K_p*sys.qtilde(q) + 0.5*sys.ptilde(q,p).'*sys.ptilde(q,p);q = x_out(i, 1:2)';
+    p = x_out(i, 3:4)';
+    H_tilde_out(i) = sys.H_tilde(q, p);
+    q_tilde_out(i,:) = sys.qtilde(q);
+    p_tilde_out(i,:) = sys.ptilde(q,p);
+end
+% Plot q1 vs q2
+figure;
+ylim([min(x_out(:,2)) max(x_out(:,2))]);
+q1_values = linspace(sys.a, sys.b, 1000);
+plot([sys.a, sys.a], [-1,1], 'DisplayName', 'Wall at a', 'LineWidth', 4, 'Color', hexToRGB(colors(2,:)))
+hold on;
+plot([sys.b, sys.b], [-1,1], 'DisplayName', 'Wall at b', 'LineWidth', 4, 'Color', hexToRGB(colors(2,:)))
+plot(qd_out(:,1),qd_out(:,2),'DisplayName', 'Desired path $q_d(q_1)$', 'LineWidth', 5, 'Color', hexToRGB(colors(1,:)))
+plot(x_out(:,1), x_out(:,2),'--', 'Color', hexToRGB(colors(4,:)), 'DisplayName', 'q(t)', 'LineWidth', 2.5);
+axis([-0.1 1.1 -0.6 0.6])
+title('Position q_1 vs q_2', 'Interpreter','latex','FontSize', 16);
+xlabel('$q_1$', 'Interpreter','latex','FontSize', 32);
+ylabel('$q_2$', 'Interpreter','latex','FontSize', 32);
+legend('show', 'Interpreter','latex','FontSize', 16);
+hold off;
+% Plot closed loop energy
+figure;
+plot(t_out, H_tilde_out, 'LineWidth', 4, 'Color', hexToRGB(colors(2,:)), 'DisplayName', '$\tilde{H}$');
+hold on;
+plot(t_out(event_indices), H_tilde_out(event_indices), 'ro', 'MarkerSize', 6, 'DisplayName', 'Events', 'Color', hexToRGB(colors(2,:)));
+% title('Closed-Loop Energy $\tilde{H}$ vs Time','FontSize', 16, 'Interpreter','latex');
+xlabel('t (s)','FontSize', 32);
+ylabel('$\tilde{H}$', 'Interpreter','latex','FontSize', 32);
+legend('show', 'Interpreter','latex','FontSize', 32);
+
+
+
+
+function x_plus = impact_mapping(x_minus,sys)
+    x_plus = [x_minus(1:2);sys.P*x_minus(3:4)];
+end
+
+function u = controller(x, sys)
+    q = x(1:2);
+    p = x(3:4);
+    % Desired configuration
+    sys.qd = @(q) [q(1); 0.5 * sys.phase * sin(pi * (q(1) - sys.a) / (sys.b - sys.a))];
+    sys.qtilde = @(q) q - sys.qd(q(1));
+    
+    % Desired momentum
+    sys.qdotstar = @(q) sys.phase*subs(jacobian(sys.qd(sys.q),sys.q(1)),sys.q(1),q(1));
+    sys.dqtildedq = @(q) subs(jacobian(sys.qtilde(sys.q),sys.q),sys.q, q);
+    sys.pd = @(q) sys.M*(sys.qdotstar(q) - sys.K_p*sys.qtilde(q));
+    sys.dpddq = @(q) subs(jacobian(sys.pd(sys.q),sys.q),sys.q,q);
+    sys.ptilde = @(q,p) p - sys.pd(q);
+
+    % Controller
+    u = double(sys.G\(sys.dHdq + sys.dpddq(q)*(sys.M\p) - sys.M\(sys.dqtildedq(q).'*sys.qtilde(q)) - sys.K_d*sys.ptilde(q,p)));
+end
+
+function dx = system_dynamics(~, x, sys)
+    %% Continuous Dynamics
+    q = x(1:2);
+    p = x(3:4);
+    u = controller(x,sys);
+    dx = sys.J*[sys.dHdq; sys.dHdp(p)] + [zeros(2,1); sys.G*u];
+end
+
+function [value, isterminal, direction] = collision_events(~, x,sys)
+    %% Event detection for collisions    
+    % Detect when q1 is equal to a or b
+    value = [x(1) - sys.a; sys.b - x(1)];
+    isterminal = [1; 1];  % Stop the integration
+    direction = [-1; -1];  % 'a' from the right and 'b' from the left
+end
