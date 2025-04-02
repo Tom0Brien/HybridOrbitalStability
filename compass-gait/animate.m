@@ -1,6 +1,6 @@
 function animate(q,tci,p)
     % Record Figure
-    writerObj = VideoWriter('passive_walk');
+    writerObj = VideoWriter('results/passive_walk');
     writerObj.FrameRate = 60;
     writerObj.Quality = 100;
     open(writerObj);
@@ -23,13 +23,12 @@ function animate(q,tci,p)
 
     % Plot slope
     R = @(slope) [cos(slope), sin(slope); -sin(slope), cos(slope)];
-    rPAa = R(p.psi)*[100;0];   % Point at end of slope rotated
+    rPAa = R(p.psi)*[100;0];
     rPAa2 = R(p.psi)*[-100;0];
     slope = line([rPAa2(1) rPAa(1)], [rPAa2(2) rPAa(2)]);
     set(slope,'Color','#545454','LineWidth',4)
 
     % Draw first position
-    % Use the new color scheme for stleg and swleg
     stanceColor = '#a5d0ea';  % Light blue
     swingColor  = '#c2e5ce';  % Light green
 
@@ -42,8 +41,6 @@ function animate(q,tci,p)
     hip   = plot(rBAa(1), rBAa(2), 'o', 'MarkerSize', 15, 'MarkerFaceColor', 'blue');
     lfoot = plot(rAAa(1), rAAa(2), 'o', 'MarkerSize', 10, 'MarkerFaceColor', 'white', 'MarkerEdgeColor', '#545454', 'LineWidth', 2);
     rfoot = plot(rCBa(1), rCBa(2), 'o', 'MarkerSize', 10, 'MarkerFaceColor', 'white', 'MarkerEdgeColor', '#545454', 'LineWidth', 2);
-
-    % tci includes touchdown indices; pad with 0 to start from the beginning
     tci = [0, tci];
     rAAa = [0;0]; % Reset stance foot
 
@@ -73,11 +70,10 @@ function animate(q,tci,p)
 
             % Capture and resize the frame for the video
             frame = getframe(gcf);
-            % resized_frame = imresize(frame.cdata, [400, 720]);
             writeVideo(writerObj, frame);
         end
 
-        % Add History Plot (light trace every 2 steps)
+        % Add light trace every 2 steps
         if (mod(j,2) == 0)
             stleg_hist = line([rAAa(1) rBAa(1)], [rAAa(2) rBAa(2)]);
             set(stleg_hist,'Color',[0 0 0 0.2],'LineWidth',3,'LineStyle','--');

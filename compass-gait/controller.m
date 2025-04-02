@@ -1,12 +1,4 @@
 function ctrl = controller(sys,Kp,Kd,qd_sym,dqd_sym)
-%% CONTROLLER
-% Generates a controller for a 2DOF manipulator with user provided gains 
-% Kp, Kd and K_alpha
-
-%% Symbolic variables
-syms z1 z2 
-z_sym = [z1 z2].';
-
 %% System dimensions
 n = sys.nq;
 

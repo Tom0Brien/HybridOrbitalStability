@@ -1,7 +1,4 @@
 function sys = model()
-%% MODEL 
-% Generates a structure defining a 2DOF robotic manipulator
-
 %% Symbolic variables
 syms q1 q2 p1 p2
 sys.q_sym = [q1; q2];
@@ -13,7 +10,7 @@ sys.nq = 2;
 %% Input mapping matrix
 sys.G = @(q) [1 0; 1 -1];
 
-%% Inertial parameters
+%% Mass matrix
 sys.mH = 10;
 sys.m = 5;
 sys.l = 1;
@@ -26,7 +23,7 @@ sys.m21 = @(q) -sys.m*sys.l*sys.b*cos(q(1)-q(2));
 sys.m22 = @(q) sys.m*sys.b^2;
 sys.M = @(q) [sys.m11(q) sys.m12(q); sys.m21(q), sys.m22(q)];
 
-%% Coriolis Matrix 
+%% Coriolis matrix 
 c11 = @(q,dq) 0;
 c12 = @(q,dq) -sys.m*sys.l*sys.b*sin(q(1) - q(2))*dq(2);
 c21 = @(q,dq) sys.m*sys.l*sys.b*sin(q(1) - q(2))*dq(1);
