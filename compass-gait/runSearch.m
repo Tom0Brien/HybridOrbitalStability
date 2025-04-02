@@ -1,6 +1,6 @@
 function [qd_sym, dqd_sym] = runSearch(sys)
     %% Define the search parameters
-    N = 250;
+    N = 25;
     T = 0.5;
     k = 5;
     b_ij0 = zeros(sys.nq, k);
