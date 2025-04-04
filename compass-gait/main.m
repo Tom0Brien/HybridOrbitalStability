@@ -6,16 +6,15 @@ sys = model;
 [qd_sym, dqd_sym] = runSearch(sys);
 
 %% Build Controller
-ctrl = controller(sys,1,8,qd_sym,dqd_sym);
-
-%% Wrappers for impact event and mapping
-impactMapping = @(x) impactMap(x,sys);
-impactEventDetection = @(t,x) impactEvent(t,x,sys);
+ctrl = controller(sys,1*eye(sys.nq),8*eye(sys.nq),qd_sym,dqd_sym);
 
 %% Simulation Parameters
 sim = simParams();
 sim.dx = @(q,dq,u) [dq;sys.M(q)\(-sys.C(q,dq)*dq - sys.g(q) - sys.D(q)*dq + sys.G(q)*u)];
 sim.ode = @(t,x) sim.dx(x(1:2),x(3:4),ctrl.u(t,x(1:2),sys.M(x(1:2))*x(3:4)));
+% Impact event and mapping
+impactMapping = @(x) impactMap(x,sys);
+impactEventDetection = @(t,x) impactEvent(t,x,sys);
 sim.options = odeset('Events', impactEventDetection,'RelTol',1e-9,'AbsTol',1e-9);
 
 %% Run simulation

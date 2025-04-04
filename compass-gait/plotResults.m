@@ -13,14 +13,14 @@ function plotResults(sys, ctrl, sim, res)
     res.qd = zeros(N,2);
     res.qe = zeros(N,2);
     res.vstar = zeros(N,2);
-    res.qp  = zeros(N,2);
+    res.qstar  = zeros(N,2);
     
     for i = 1:N
         res.p(i,:) = sys.M(res.q(i,:)) * res.X(i,3:4).';
         res.H(i)  = sys.H(res.q(i,:).', res.p(i,:).');
         res.Hd(i) = ctrl.Hd(res.q(i,:).', res.p(i,:).');
-        res.qp(i,:) = ctrl.qp(res.q(i,:)).';
-        res.qe(i,:) = res.q(i,:) - res.qp(i,:);
+        res.qstar(i,:) = ctrl.qstar(res.q(i,:)).';
+        res.qe(i,:) = res.q(i,:) - res.qstar(i,:);
         res.vstar(i,:) = ctrl.vstar(res.q(i,1));
     end
     all_indices = res.impact_idx;
@@ -33,7 +33,7 @@ function plotResults(sys, ctrl, sim, res)
         if mod(seg,2) == 0
             res.q(idx_range,:) = res.q(idx_range, [2,1]);
             res.p(idx_range,:) = res.p(idx_range, [2,1]);
-            res.qp(idx_range,:) = res.qp(idx_range, [2,1]);
+            res.qstar(idx_range,:) = res.qstar(idx_range, [2,1]);
         end
         start_idx = all_indices(seg) + 1;
     end
@@ -42,7 +42,7 @@ function plotResults(sys, ctrl, sim, res)
     T_end = res.T(find(any(res.X,2), 1, 'last'));
     validIdx = res.T <= T_end;
     t_valid = res.T(validIdx);
-    qp_valid = res.qp(validIdx,:);
+    qp_valid = res.qstar(validIdx,:);
     dqd_valid = res.vstar(validIdx,:);
     
     figure(1);
